@@ -25,12 +25,19 @@ pub trait PixelFormat {
 }
 
 /// All coordinates are effect-relative and in pixels.
-pub trait PostEffect<P: PixelFormat> {
+///
+/// [`Effect`]s are drawn back-to-front after sprites into a buffer, with premultiplied alpha (if applicable).
+pub trait Effect<P: PixelFormat> {
 	/// Gets the applicable line range.
-	fn lines(&self) -> Range<isize>;
+	fn lines(&self, all_lines_range: Option<Range<isize>>) -> Range<isize>;
 
 	/// Gets the line segment affected by a particular line in this effect.
-	fn line_segment(&self, line: usize, line_span: Range<isize>) -> Range<isize>;
+	fn line_segment(
+		&self,
+		all_lines_range: Option<Range<isize>>,
+		line: usize,
+		line_span: Range<isize>,
+	) -> Range<isize>;
 
 	/// Renders the given segment of the given line. The relevant data is offset `offset_bits` into `data`.
 	///
@@ -39,6 +46,7 @@ pub trait PostEffect<P: PixelFormat> {
 	/// `offset_bits` can be relied on to be a multiple of `P::BITS_PER_PIXEL` modulo 8.
 	fn render(
 		&self,
+		all_lines_range: Option<Range<isize>>,
 		line: isize,
 		line_span: Range<isize>,
 		segment: Range<isize>,
@@ -46,26 +54,142 @@ pub trait PostEffect<P: PixelFormat> {
 		data: &mut [u8],
 	);
 }
+impl<T, P: PixelFormat> Effect<P> for &T
+where
+	T: Effect<P>,
+{
+	fn lines(&self, all_lines_range: Option<Range<isize>>) -> Range<isize> {
+		T::lines(self, all_lines_range)
+	}
+
+	fn line_segment(
+		&self,
+		all_lines_range: Option<Range<isize>>,
+		line: usize,
+		line_span: Range<isize>,
+	) -> Range<isize> {
+		T::line_segment(self, all_lines_range, line, line_span)
+	}
+
+	fn render(
+		&self,
+		all_lines_range: Option<Range<isize>>,
+		line: isize,
+		line_span: Range<isize>,
+		segment: Range<isize>,
+		offset_bits: usize,
+		data: &mut [u8],
+	) {
+		T::render(
+			self,
+			all_lines_range,
+			line,
+			line_span,
+			segment,
+			offset_bits,
+			data,
+		)
+	}
+}
 
 /// All coordinates are sprite-relative and in pixels.
+///
+/// [`Sprite`]s are drawn front to back into a buffer, with premultiplied alpha (if applicable).
 pub trait Sprite<P: PixelFormat> {
 	/// Gets the applicable line range.
-	fn lines(&self) -> Range<isize>;
+	fn lines(&self, all_lines_range: Option<Range<isize>>) -> Range<isize>;
 
 	/// Gets the line segment affected by a particular line in this sprite.
-	fn line_segment(&self, line: usize, line_span: Range<isize>) -> Range<isize>;
+	fn line_segment(
+		&self,
+		all_lines_range: Option<Range<isize>>,
+		line: usize,
+		line_span: Range<isize>,
+	) -> Range<isize>;
 
 	/// Renders the given segment of the given line. The relevant data is offset `offset_bits` into `data`.
-	///
-	/// [`Sprite`]s are drawn front to back into a buffer with premultiplied alpha.
 	///
 	/// `offset_bits` can be relied on to be a multiple of `P::BITS_PER_PIXEL` modulo 8.
 	fn render(
 		&self,
+		all_lines_range: Option<Range<isize>>,
 		line: isize,
 		line_span: Range<isize>,
 		segment: Range<isize>,
 		offset_bits: usize,
 		data: &mut [u8],
 	);
+}
+impl<T, P: PixelFormat> Sprite<P> for &T
+where
+	T: Sprite<P>,
+{
+	fn lines(&self, all_lines_range: Option<Range<isize>>) -> Range<isize> {
+		T::lines(self, all_lines_range)
+	}
+
+	fn line_segment(
+		&self,
+		all_lines_range: Option<Range<isize>>,
+		line: usize,
+		line_span: Range<isize>,
+	) -> Range<isize> {
+		T::line_segment(self, all_lines_range, line, line_span)
+	}
+
+	fn render(
+		&self,
+		all_lines_range: Option<Range<isize>>,
+		line: isize,
+		line_span: Range<isize>,
+		segment: Range<isize>,
+		offset_bits: usize,
+		data: &mut [u8],
+	) {
+		T::render(
+			self,
+			all_lines_range,
+			line,
+			line_span,
+			segment,
+			offset_bits,
+			data,
+		)
+	}
+}
+
+/// An offset of a renderable.
+pub struct Position {
+	/// Rightwards offset, in pixels.
+	pub x: isize,
+	/// Downwards offset, in pixels.
+	pub y: isize,
+}
+
+pub fn render_line<'a, P: PixelFormat, S: 'a + Sprite<P>, E: 'a + Effect<P>>(
+	all_lines_range: Option<Range<isize>>,
+	line_index: isize,
+	buffer: &mut [u8],
+	sprites: impl IntoIterator<Item = &'a S>,
+	post_effects: impl IntoIterator<Item = &'a E>,
+) {
+	render_segment(
+		all_lines_range,
+		line_index,
+		0,
+		buffer,
+		sprites,
+		post_effects,
+	)
+}
+
+pub fn render_segment<'a, P: PixelFormat, S: 'a + Sprite<P>, E: 'a + Effect<P>>(
+	all_lines_range: Option<Range<isize>>,
+	line_index: isize,
+	segment_offset: isize,
+	buffer: &mut [u8],
+	sprites: impl IntoIterator<Item = &'a S>,
+	post_effects: impl IntoIterator<Item = &'a E>,
+) {
+	todo!()
 }

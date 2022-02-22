@@ -1,4 +1,4 @@
-use crate::{pixel_formats::RgbaNoPadding, PixelFormat, PostEffect, Sprite};
+use crate::{pixel_formats::RgbaNoPadding, Effect, PixelFormat, Sprite};
 use std::{convert::TryInto, marker::PhantomData, ops::Range};
 use tap::{Conv, TryConv};
 
@@ -28,13 +28,18 @@ impl<'a> Bitmap<'a, RgbaNoPadding<8>> {
 	}
 }
 impl Sprite<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
-	fn lines(&self) -> Range<isize> {
+	fn lines(&self, _all_lines_range: Option<Range<isize>>) -> Range<isize> {
 		0..(self.data.len() / 4 / self.width)
 			.try_into()
 			.expect("`isize` too small to represent sprite height")
 	}
 
-	fn line_segment(&self, _line: usize, _line_span: Range<isize>) -> Range<isize> {
+	fn line_segment(
+		&self,
+		_all_lines_range: Option<Range<isize>>,
+		_line: usize,
+		_line_span: Range<isize>,
+	) -> Range<isize> {
 		0..self
 			.width
 			.try_into()
@@ -43,6 +48,7 @@ impl Sprite<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
 
 	fn render(
 		&self,
+		_all_lines_range: Option<Range<isize>>,
 		line: isize,
 		_line_span: Range<isize>,
 		segment: Range<isize>,
@@ -82,14 +88,19 @@ impl Sprite<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
 	}
 }
 
-impl PostEffect<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
-	fn lines(&self) -> Range<isize> {
+impl Effect<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
+	fn lines(&self, _all_lines_range: Option<Range<isize>>) -> Range<isize> {
 		0..(self.data.len() / 4 / self.width)
 			.try_into()
 			.expect("`isize` too small to represent sprite height")
 	}
 
-	fn line_segment(&self, _line: usize, _line_span: Range<isize>) -> Range<isize> {
+	fn line_segment(
+		&self,
+		_all_lines_range: Option<Range<isize>>,
+		_line: usize,
+		_line_span: Range<isize>,
+	) -> Range<isize> {
 		0..self
 			.width
 			.try_into()
@@ -98,6 +109,7 @@ impl PostEffect<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
 
 	fn render(
 		&self,
+		_all_lines_range: Option<Range<isize>>,
 		line: isize,
 		_line_span: Range<isize>,
 		segment: Range<isize>,
