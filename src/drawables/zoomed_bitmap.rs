@@ -1,23 +1,23 @@
-use std::{convert::TryInto, marker::PhantomData, ops::Range};
-use tap::{Conv, TryConv};
 use crate::{pixel_formats::RgbaNoPadding, PixelFormat, PostEffect, Sprite};
+use std::{convert::TryInto, iter, marker::PhantomData, ops::Range};
+use tap::{Conv, Pipe, TryConv};
 
-/// A simple bitmap sprite.
-pub struct Bitmap<'a, P: PixelFormat> {
+/// An integer-zoomed bitmap sprite.
+pub struct ZoomedBitmap<'a, P: PixelFormat> {
 	width: usize,
 	data: &'a [u8],
+	zoom_factor: usize,
 	_phantom: PhantomData<P>,
 }
-impl Sprite<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
+impl Sprite<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 	fn lines(&self) -> Range<isize> {
-		0..(self.data.len() / 4 / self.width)
+		0..(self.data.len() / 4 / self.width * self.zoom_factor)
 			.try_into()
 			.expect("`isize` too small to represent sprite height")
 	}
 
 	fn line_segment(&self, _line: usize, _line_span: Range<isize>) -> Range<isize> {
-		0..self
-			.width
+		0..(self.width * self.zoom_factor)
 			.try_into()
 			.expect("`isize` too small to represent sprite width")
 	}
@@ -34,19 +34,24 @@ impl Sprite<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
 
 		assert!(line >= 0);
 		let line: usize = line.try_into().expect("infallible");
-		assert!(line < self.data.len() / PIXEL_BYTES / self.width);
+		assert!(line < self.data.len() / PIXEL_BYTES / self.width * self.zoom_factor);
 		assert!(offset_bits % 8 == 0);
 		assert!(segment.start >= 0);
 		assert!(segment.start <= segment.end);
 		let segment: Range<usize> = segment.start.try_into().expect("infallible")
 			..segment.end.try_into().expect("infallible");
-		assert!(segment.end.try_conv::<usize>().expect("infallible") <= self.width);
+		assert!(
+			segment.end.try_conv::<usize>().expect("infallible") <= self.width * self.zoom_factor
+		);
 		assert_eq!(segment.len() * PIXEL_BYTES, data.len());
 
 		for (src, dest) in self
 			.data
-			.chunks_exact(PIXEL_BYTES)
-			.skip(line * self.width)
+			.chunks_exact(self.width * PIXEL_BYTES)
+			.pipe(|lines| repeat_each(lines, self.zoom_factor))
+			.skip(line)
+			.flat_map(|line| line.chunks_exact(PIXEL_BYTES))
+			.pipe(|pixels| repeat_each(pixels, self.zoom_factor))
 			.skip(segment.start)
 			.take(segment.len())
 			.zip(data.chunks_exact_mut(PIXEL_BYTES))
@@ -63,7 +68,7 @@ impl Sprite<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
 	}
 }
 
-impl PostEffect<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
+impl PostEffect<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 	fn lines(&self) -> Range<isize> {
 		0..(self.data.len() / 4 / self.width)
 			.try_into()
@@ -100,8 +105,11 @@ impl PostEffect<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
 
 		for (src, dest) in self
 			.data
-			.chunks_exact(PIXEL_BYTES)
-			.skip(line * self.width)
+			.chunks_exact(self.width * PIXEL_BYTES)
+			.pipe(|lines| repeat_each(lines, self.zoom_factor))
+			.skip(line)
+			.flat_map(|line| line.chunks_exact(PIXEL_BYTES))
+			.pipe(|pixels| repeat_each(pixels, self.zoom_factor))
 			.skip(segment.start)
 			.take(segment.len())
 			.zip(data.chunks_exact_mut(PIXEL_BYTES))
@@ -117,4 +125,10 @@ impl PostEffect<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
 			}
 		}
 	}
+}
+
+fn repeat_each<T: Clone>(items: impl IntoIterator<Item = T>, n: usize) -> impl Iterator<Item = T> {
+	items
+		.into_iter()
+		.flat_map(move |item| iter::repeat(item).take(n))
 }
