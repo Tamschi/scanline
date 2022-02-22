@@ -1,6 +1,6 @@
+use crate::{pixel_formats::RgbaNoPadding, PixelFormat, PostEffect, Sprite};
 use std::{convert::TryInto, marker::PhantomData, ops::Range};
 use tap::{Conv, TryConv};
-use crate::{pixel_formats::RgbaNoPadding, PixelFormat, PostEffect, Sprite};
 
 /// A simple bitmap sprite.
 pub struct Bitmap<'a, P: PixelFormat> {
