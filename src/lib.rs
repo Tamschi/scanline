@@ -264,13 +264,27 @@ pub fn render_segment<
 			line_index,
 			line_span.clone(),
 		)) {
+			let buffer_clip_pixels = segment_span.clone().offset(position.x);
+			let buffer_clip_pixels: Range<usize> = buffer_clip_pixels
+				.start
+				.try_into()
+				.expect("buffer clip pixels")
+				..buffer_clip_pixels
+					.end
+					.try_into()
+					.expect("buffer clip pixels");
+
+			let buffer_clip =
+				(segment_offset_bits + buffer_clip_pixels.start * P::PIXEL_STRIDE_BITS + 7) / 8
+					..(segment_offset_bits + buffer_clip_pixels.end * P::PIXEL_STRIDE_BITS + 7) / 8;
+
 			sprite.render(
 				all_lines_range,
 				line_index,
 				line_span,
 				segment_span,
 				segment_offset_bits,
-				buffer,
+				&mut buffer[buffer_clip],
 			)
 		}
 	}
@@ -292,13 +306,27 @@ pub fn render_segment<
 			line_index,
 			line_span.clone(),
 		)) {
+			let buffer_clip_pixels = segment_span.clone().offset(position.x);
+			let buffer_clip_pixels: Range<usize> = buffer_clip_pixels
+				.start
+				.try_into()
+				.expect("buffer clip pixels")
+				..buffer_clip_pixels
+					.end
+					.try_into()
+					.expect("buffer clip pixels");
+
+			let buffer_clip =
+				(segment_offset_bits + buffer_clip_pixels.start * P::PIXEL_STRIDE_BITS + 7) / 8
+					..(segment_offset_bits + buffer_clip_pixels.end * P::PIXEL_STRIDE_BITS + 7) / 8;
+
 			effect.render(
 				all_lines_range,
 				line_index,
 				line_span,
 				segment_span,
 				segment_offset_bits,
-				buffer,
+				&mut buffer[buffer_clip],
 			)
 		}
 	}
