@@ -6,18 +6,24 @@ use tap::{Conv, Pipe, TryConv};
 pub struct ZoomedBitmap<'a, P: PixelFormat> {
 	width: usize,
 	data: &'a [u8],
-	zoom_factor: usize,
+	horizontal_zoom_factor: usize,
+	vertical_zoom_factor: usize,
 	_phantom: PhantomData<P>,
 }
 impl Sprite<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
-	fn lines(&self) -> Range<isize> {
-		0..(self.data.len() / 4 / self.width * self.zoom_factor)
+	fn lines(&self, _all_lines_range: Option<Range<isize>>) -> Range<isize> {
+		0..(self.data.len() / 4 / self.width * self.vertical_zoom_factor)
 			.try_into()
 			.expect("`isize` too small to represent sprite height")
 	}
 
-	fn line_segment(&self, _line: usize, _line_span: Range<isize>) -> Range<isize> {
-		0..(self.width * self.zoom_factor)
+	fn line_segment(
+		&self,
+		_all_lines_range: Option<Range<isize>>,
+		_line: usize,
+		_line_span: Range<isize>,
+	) -> Range<isize> {
+		0..(self.width * self.horizontal_zoom_factor)
 			.try_into()
 			.expect("`isize` too small to represent sprite width")
 	}
@@ -34,24 +40,25 @@ impl Sprite<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 
 		assert!(line >= 0);
 		let line: usize = line.try_into().expect("infallible");
-		assert!(line < self.data.len() / PIXEL_BYTES / self.width * self.zoom_factor);
+		assert!(line < self.data.len() / PIXEL_BYTES / self.width * self.vertical_zoom_factor);
 		assert!(offset_bits % 8 == 0);
 		assert!(segment.start >= 0);
 		assert!(segment.start <= segment.end);
 		let segment: Range<usize> = segment.start.try_into().expect("infallible")
 			..segment.end.try_into().expect("infallible");
 		assert!(
-			segment.end.try_conv::<usize>().expect("infallible") <= self.width * self.zoom_factor
+			segment.end.try_conv::<usize>().expect("infallible")
+				<= self.width * self.horizontal_zoom_factor
 		);
 		assert_eq!(segment.len() * PIXEL_BYTES, data.len());
 
 		for (src, dest) in self
 			.data
 			.chunks_exact(self.width * PIXEL_BYTES)
-			.pipe(|lines| repeat_each(lines, self.zoom_factor))
+			.pipe(|lines| repeat_each(lines, self.vertical_zoom_factor))
 			.skip(line)
 			.flat_map(|line| line.chunks_exact(PIXEL_BYTES))
-			.pipe(|pixels| repeat_each(pixels, self.zoom_factor))
+			.pipe(|pixels| repeat_each(pixels, self.horizontal_zoom_factor))
 			.skip(segment.start)
 			.take(segment.len())
 			.zip(data.chunks_exact_mut(PIXEL_BYTES))
@@ -94,22 +101,25 @@ impl PostEffect<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 
 		assert!(line >= 0);
 		let line: usize = line.try_into().expect("infallible");
-		assert!(line < self.data.len() / PIXEL_BYTES / self.width);
-		assert!(offset_bits % 8 == 0);
+		assert!(line < self.data.len() / PIXEL_BYTES / self.width * self.vertical_zoom_factor);
+		assert_eq!(offset_bits % 8, 0);
 		assert!(segment.start >= 0);
 		assert!(segment.start <= segment.end);
 		let segment: Range<usize> = segment.start.try_into().expect("infallible")
 			..segment.end.try_into().expect("infallible");
-		assert!(segment.end.try_conv::<usize>().expect("infallible") <= self.width);
+		assert!(
+			segment.end.try_conv::<usize>().expect("infallible")
+				<= self.width * self.horizontal_zoom_factor
+		);
 		assert_eq!(segment.len() * PIXEL_BYTES, data.len());
 
 		for (src, dest) in self
 			.data
 			.chunks_exact(self.width * PIXEL_BYTES)
-			.pipe(|lines| repeat_each(lines, self.zoom_factor))
+			.pipe(|lines| repeat_each(lines, self.vertical_zoom_factor))
 			.skip(line)
 			.flat_map(|line| line.chunks_exact(PIXEL_BYTES))
-			.pipe(|pixels| repeat_each(pixels, self.zoom_factor))
+			.pipe(|pixels| repeat_each(pixels, self.horizontal_zoom_factor))
 			.skip(segment.start)
 			.take(segment.len())
 			.zip(data.chunks_exact_mut(PIXEL_BYTES))
