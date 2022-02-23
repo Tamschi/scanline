@@ -9,7 +9,11 @@
 #![warn(clippy::pedantic, missing_docs)]
 #![allow(clippy::semicolon_if_nothing_returned)]
 
-use std::{convert::TryInto, ops::Range};
+use std::{
+	cmp::{max, min, Ordering},
+	convert::TryInto,
+	ops::{Add, Range},
+};
 use tap::TryConv;
 
 #[cfg(doctest)]
@@ -174,20 +178,23 @@ pub struct Position {
 /// - Iff [`P::PIXEL_STRIDE_BITS`](`PixelFormat::PIXEL_STRIDE_BITS`) isn't a multiple of 8,
 /// - and also in cases where [`render_segment`] would panic.
 pub fn render_line<P: PixelFormat, S: Sprite<P>, E: Effect<P>>(
-	all_lines_range: Option<Range<isize>>,
+	all_lines_range: &Option<Range<isize>>,
 	line_index: isize,
 	buffer: &mut [u8],
-	sprites: impl IntoIterator<Item = S>,
-	post_effects: impl IntoIterator<Item = E>,
+	sprites: impl IntoIterator<Item = (Position, S)>,
+	post_effects: impl IntoIterator<Item = (Position, E)>,
 ) {
 	assert_eq!(P::PIXEL_STRIDE_BITS % 8, 0);
+
+	let line_span = 0..(buffer.len() / (P::PIXEL_STRIDE_BITS / 8))
+		.try_into()
+		.expect("`buffer.len() / P::PIXEL_STRIDE_BITS` too large");
 
 	render_segment(
 		all_lines_range,
 		line_index,
-		0..(buffer.len() / (P::PIXEL_STRIDE_BITS / 8))
-			.try_into()
-			.expect("`buffer.len() / P::PIXEL_STRIDE_BITS` too large"),
+		line_span.clone(),
+		line_span,
 		buffer,
 		sprites,
 		post_effects,
@@ -200,12 +207,13 @@ pub fn render_line<P: PixelFormat, S: Sprite<P>, E: Effect<P>>(
 ///
 /// Iff coordinates and/or sizes are extreme enough to go out of range.
 pub fn render_segment<P: PixelFormat, S: Sprite<P>, E: Effect<P>>(
-	all_lines_range: Option<Range<isize>>,
+	all_lines_range: &Option<Range<isize>>,
 	line_index: isize,
+	line_span: Range<isize>,
 	segment_span: Range<isize>,
 	buffer: &mut [u8],
-	sprites: impl IntoIterator<Item = S>,
-	post_effects: impl IntoIterator<Item = E>,
+	sprites: impl IntoIterator<Item = (Position, S)>,
+	post_effects: impl IntoIterator<Item = (Position, E)>,
 ) {
 	let segment_offset_bits = segment_span
 		.start
@@ -218,10 +226,93 @@ pub fn render_segment<P: PixelFormat, S: Sprite<P>, E: Effect<P>>(
 		)
 		.expect("segment offset in bits too extreme")
 		% 8;
+	let segment_offset_bits: usize = segment_offset_bits
+		.try_into()
+		.expect("extreme pixel stride caused segment offset overflow");
 
-	for sprite in sprites {
+	assert!(
+		buffer.len() >= (segment_span.len() * P::PIXEL_STRIDE_BITS + segment_offset_bits + 7) / 8
+	);
+
+	for (position, sprite) in sprites {
+		let all_lines_range = all_lines_range
+			.clone()
+			.map(|all_lines_range| all_lines_range.offset(-position.y));
+		let line_index = line_index - position.y;
+
 		if !sprite.lines(all_lines_range.clone()).contains(&line_index) {
 			continue;
+		}
+
+		let line_span = line_span.clone().offset(-position.x);
+		let segment_span = segment_span.clone().offset(-position.x);
+		if let Some(segment_span) = segment_span.intersect(sprite.line_segment(
+			all_lines_range.clone(),
+			line_index,
+			line_span.clone(),
+		)) {
+			sprite.render(
+				all_lines_range,
+				line_index,
+				line_span,
+				segment_span,
+				segment_offset_bits,
+				buffer,
+			)
+		}
+	}
+
+	for (position, effect) in post_effects {
+		let all_lines_range = all_lines_range
+			.clone()
+			.map(|all_lines_range| all_lines_range.offset(-position.y));
+		let line_index = line_index - position.y;
+
+		if !effect.lines(all_lines_range.clone()).contains(&line_index) {
+			continue;
+		}
+
+		let line_span = line_span.clone().offset(-position.x);
+		let segment_span = segment_span.clone().offset(-position.x);
+		if let Some(segment_span) = segment_span.intersect(effect.line_segment(
+			all_lines_range.clone(),
+			line_index,
+			line_span.clone(),
+		)) {
+			effect.render(
+				all_lines_range,
+				line_index,
+				line_span,
+				segment_span,
+				segment_offset_bits,
+				buffer,
+			)
+		}
+	}
+}
+
+trait Offset<T: Add<U>, U> {
+	type Output;
+	fn offset(self, scalar: U) -> Self::Output;
+}
+impl<T: Add<U>, U: Clone> Offset<T, U> for Range<T> {
+	type Output = Range<T::Output>;
+
+	fn offset(self, scalar: U) -> Self::Output {
+		self.start + scalar.clone()..self.end + scalar
+	}
+}
+
+trait Intersect<T: Ord> {
+	fn intersect(self, rhs: Range<T>) -> Option<Range<T>>;
+}
+impl<T: Ord> Intersect<T> for Range<T> {
+	fn intersect(self, rhs: Range<T>) -> Option<Range<T>> {
+		match (self.start.cmp(&rhs.end), self.end.cmp(&rhs.start)) {
+			(Ordering::Less, Ordering::Greater) => {
+				Some(max(self.start, rhs.start)..min(self.end, rhs.end))
+			}
+			_ => None,
 		}
 	}
 }
