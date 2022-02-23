@@ -16,7 +16,7 @@
 [![crev reviews](https://web.crev.dev/rust-reviews/badge/crev_count/scanline.svg)](https://web.crev.dev/rust-reviews/crate/scanline/)
 [![Zulip Chat](https://img.shields.io/endpoint?label=chat&url=https%3A%2F%2Fiteration-square-automation.schichler.dev%2F.netlify%2Ffunctions%2Fstream_subscribers_shield%3Fstream%3Dproject%252Fscanline)](https://iteration-square.schichler.dev/#narrow/stream/project.2Fscanline)
 
-TODO_README_DESCRIPTION
+A simple software scanline renderer.
 
 ## Installation
 

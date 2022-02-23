@@ -3,7 +3,7 @@
 //!
 //! [![Zulip Chat](https://img.shields.io/endpoint?label=chat&url=https%3A%2F%2Fiteration-square-automation.schichler.dev%2F.netlify%2Ffunctions%2Fstream_subscribers_shield%3Fstream%3Dproject%252Fscanline)](https://iteration-square.schichler.dev/#narrow/stream/project.2Fscanline)
 //!
-//!
+//! Coordinates in this crate grow rightwards and downwards, and are in pixels unless otherwise noted.
 
 #![doc(html_root_url = "https://docs.rs/scanline/0.0.1")]
 #![warn(clippy::pedantic, missing_docs)]
@@ -166,6 +166,7 @@ pub struct Position {
 	pub y: isize,
 }
 
+/// Renders an entire line.
 pub fn render_line<'a, P: PixelFormat, S: 'a + Sprite<P>, E: 'a + Effect<P>>(
 	all_lines_range: Option<Range<isize>>,
 	line_index: isize,
@@ -183,6 +184,7 @@ pub fn render_line<'a, P: PixelFormat, S: 'a + Sprite<P>, E: 'a + Effect<P>>(
 	)
 }
 
+/// Renders a segment of a line.
 pub fn render_segment<'a, P: PixelFormat, S: 'a + Sprite<P>, E: 'a + Effect<P>>(
 	all_lines_range: Option<Range<isize>>,
 	line_index: isize,
