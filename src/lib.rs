@@ -36,7 +36,7 @@ pub trait Effect<P: PixelFormat> {
 	fn line_segment(
 		&self,
 		all_lines_range: Option<Range<isize>>,
-		line: usize,
+		line: isize,
 		line_span: Range<isize>,
 	) -> Range<isize>;
 
@@ -66,7 +66,7 @@ where
 	fn line_segment(
 		&self,
 		all_lines_range: Option<Range<isize>>,
-		line: usize,
+		line: isize,
 		line_span: Range<isize>,
 	) -> Range<isize> {
 		T::line_segment(self, all_lines_range, line, line_span)
@@ -104,7 +104,7 @@ pub trait Sprite<P: PixelFormat> {
 	fn line_segment(
 		&self,
 		all_lines_range: Option<Range<isize>>,
-		line: usize,
+		line: isize,
 		line_span: Range<isize>,
 	) -> Range<isize>;
 
@@ -132,7 +132,7 @@ where
 	fn line_segment(
 		&self,
 		all_lines_range: Option<Range<isize>>,
-		line: usize,
+		line: isize,
 		line_span: Range<isize>,
 	) -> Range<isize> {
 		T::line_segment(self, all_lines_range, line, line_span)

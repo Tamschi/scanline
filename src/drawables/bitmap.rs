@@ -37,7 +37,7 @@ impl Sprite<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
 	fn line_segment(
 		&self,
 		_all_lines_range: Option<Range<isize>>,
-		_line: usize,
+		_line: isize,
 		_line_span: Range<isize>,
 	) -> Range<isize> {
 		0..self
@@ -100,7 +100,7 @@ impl Effect<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
 	fn line_segment(
 		&self,
 		_all_lines_range: Option<Range<isize>>,
-		_line: usize,
+		_line: isize,
 		_line_span: Range<isize>,
 	) -> Range<isize> {
 		0..self

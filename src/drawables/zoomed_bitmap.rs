@@ -53,7 +53,7 @@ impl Sprite<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 	fn line_segment(
 		&self,
 		_all_lines_range: Option<Range<isize>>,
-		_line: usize,
+		_line: isize,
 		_line_span: Range<isize>,
 	) -> Range<isize> {
 		0..(self.width * self.horizontal_zoom_factor_numerator
@@ -129,7 +129,7 @@ impl Effect<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 	fn line_segment(
 		&self,
 		_all_lines_range: Option<Range<isize>>,
-		_line: usize,
+		_line: isize,
 		_line_span: Range<isize>,
 	) -> Range<isize> {
 		0..(self.width * self.horizontal_zoom_factor_numerator
