@@ -164,6 +164,7 @@ where
 }
 
 /// An offset of a renderable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {
 	/// Rightwards offset, in pixels.
 	pub x: isize,
