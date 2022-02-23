@@ -1,13 +1,15 @@
 use crate::{pixel_formats::RgbaNoPadding, Effect, PixelFormat, Sprite};
-use std::{convert::TryInto, iter, marker::PhantomData, ops::Range};
+use std::{convert::TryInto, iter, marker::PhantomData, num::NonZeroUsize, ops::Range};
 use tap::{Conv, Pipe, TryConv};
 
 /// An integer-zoomed bitmap sprite, drawn with saturating addition.
 pub struct ZoomedBitmap<'a, P: PixelFormat> {
 	width: usize,
 	data: &'a [u8],
-	horizontal_zoom_factor: usize,
-	vertical_zoom_factor: usize,
+	horizontal_zoom_factor_numerator: usize,
+	horizontal_zoom_factor_denominator: NonZeroUsize,
+	vertical_zoom_factor_numerator: usize,
+	vertical_zoom_factor_denominator: NonZeroUsize,
 	_phantom: PhantomData<P>,
 }
 impl<'a> ZoomedBitmap<'a, RgbaNoPadding<8>> {
@@ -20,8 +22,10 @@ impl<'a> ZoomedBitmap<'a, RgbaNoPadding<8>> {
 	pub fn new(
 		width: usize,
 		data: &'a [u8],
-		horizontal_zoom_factor: usize,
-		vertical_zoom_factor: usize,
+		horizontal_zoom_factor_numerator: usize,
+		horizontal_zoom_factor_denominator: NonZeroUsize,
+		vertical_zoom_factor_numerator: usize,
+		vertical_zoom_factor_denominator: NonZeroUsize,
 	) -> Self {
 		assert_eq!(
 			data.len() % (width * RgbaNoPadding::<8>::PIXEL_STRIDE_BITS * 8),
@@ -30,15 +34,18 @@ impl<'a> ZoomedBitmap<'a, RgbaNoPadding<8>> {
 		Self {
 			width,
 			data,
-			horizontal_zoom_factor,
-			vertical_zoom_factor,
+			horizontal_zoom_factor_numerator,
+			horizontal_zoom_factor_denominator,
+			vertical_zoom_factor_numerator,
+			vertical_zoom_factor_denominator,
 			_phantom: PhantomData,
 		}
 	}
 }
 impl Sprite<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 	fn lines(&self, _all_lines_range: Option<Range<isize>>) -> Range<isize> {
-		0..(self.data.len() / 4 / self.width * self.vertical_zoom_factor)
+		0..(self.data.len() / 4 / self.width * self.vertical_zoom_factor_numerator
+			/ self.vertical_zoom_factor_denominator)
 			.try_into()
 			.expect("`isize` too small to represent sprite height")
 	}
@@ -49,7 +56,8 @@ impl Sprite<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 		_line: usize,
 		_line_span: Range<isize>,
 	) -> Range<isize> {
-		0..(self.width * self.horizontal_zoom_factor)
+		0..(self.width * self.horizontal_zoom_factor_numerator
+			/ self.horizontal_zoom_factor_denominator)
 			.try_into()
 			.expect("`isize` too small to represent sprite width")
 	}
@@ -67,7 +75,10 @@ impl Sprite<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 
 		assert!(line >= 0);
 		let line: usize = line.try_into().expect("infallible");
-		assert!(line < self.data.len() / PIXEL_BYTES / self.width * self.vertical_zoom_factor);
+		assert!(
+			line < self.data.len() / PIXEL_BYTES / self.width * self.vertical_zoom_factor_numerator
+				/ self.vertical_zoom_factor_denominator
+		);
 		assert_eq!(offset_bits % 8, 0);
 		assert!(segment.start >= 0);
 		assert!(segment.start <= segment.end);
@@ -75,17 +86,20 @@ impl Sprite<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 			..segment.end.try_into().expect("infallible");
 		assert!(
 			segment.end.try_conv::<usize>().expect("infallible")
-				<= self.width * self.horizontal_zoom_factor
+				<= self.width * self.horizontal_zoom_factor_numerator
+					/ self.horizontal_zoom_factor_denominator
 		);
 		assert_eq!(segment.len() * PIXEL_BYTES, data.len());
 
 		for (src, dest) in self
 			.data
 			.chunks_exact(self.width * PIXEL_BYTES)
-			.pipe(|lines| repeat_each(lines, self.vertical_zoom_factor))
+			.pipe(|lines| repeat_each(lines, self.vertical_zoom_factor_numerator))
+			.step_by(self.vertical_zoom_factor_denominator.get())
 			.skip(line)
 			.flat_map(|line| line.chunks_exact(PIXEL_BYTES))
-			.pipe(|pixels| repeat_each(pixels, self.horizontal_zoom_factor))
+			.pipe(|pixels| repeat_each(pixels, self.horizontal_zoom_factor_numerator))
+			.step_by(self.horizontal_zoom_factor_denominator.get())
 			.skip(segment.start)
 			.take(segment.len())
 			.zip(data.chunks_exact_mut(PIXEL_BYTES))
@@ -106,7 +120,8 @@ impl Sprite<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 
 impl Effect<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 	fn lines(&self, _all_lines_range: Option<Range<isize>>) -> Range<isize> {
-		0..(self.data.len() / 4 / self.width)
+		0..(self.data.len() / 4 / self.width * self.vertical_zoom_factor_numerator
+			/ self.vertical_zoom_factor_denominator)
 			.try_into()
 			.expect("`isize` too small to represent sprite height")
 	}
@@ -117,8 +132,8 @@ impl Effect<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 		_line: usize,
 		_line_span: Range<isize>,
 	) -> Range<isize> {
-		0..self
-			.width
+		0..(self.width * self.horizontal_zoom_factor_numerator
+			/ self.horizontal_zoom_factor_denominator)
 			.try_into()
 			.expect("`isize` too small to represent sprite width")
 	}
@@ -136,7 +151,10 @@ impl Effect<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 
 		assert!(line >= 0);
 		let line: usize = line.try_into().expect("infallible");
-		assert!(line < self.data.len() / PIXEL_BYTES / self.width * self.vertical_zoom_factor);
+		assert!(
+			line < self.data.len() / PIXEL_BYTES / self.width * self.vertical_zoom_factor_numerator
+				/ self.vertical_zoom_factor_denominator
+		);
 		assert_eq!(offset_bits % 8, 0);
 		assert!(segment.start >= 0);
 		assert!(segment.start <= segment.end);
@@ -144,17 +162,20 @@ impl Effect<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 			..segment.end.try_into().expect("infallible");
 		assert!(
 			segment.end.try_conv::<usize>().expect("infallible")
-				<= self.width * self.horizontal_zoom_factor
+				<= self.width * self.horizontal_zoom_factor_numerator
+					/ self.horizontal_zoom_factor_denominator
 		);
 		assert_eq!(segment.len() * PIXEL_BYTES, data.len());
 
 		for (src, dest) in self
 			.data
 			.chunks_exact(self.width * PIXEL_BYTES)
-			.pipe(|lines| repeat_each(lines, self.vertical_zoom_factor))
+			.pipe(|lines| repeat_each(lines, self.vertical_zoom_factor_numerator))
+			.step_by(self.vertical_zoom_factor_denominator.get())
 			.skip(line)
 			.flat_map(|line| line.chunks_exact(PIXEL_BYTES))
-			.pipe(|pixels| repeat_each(pixels, self.horizontal_zoom_factor))
+			.pipe(|pixels| repeat_each(pixels, self.horizontal_zoom_factor_numerator))
+			.step_by(self.horizontal_zoom_factor_denominator.get())
 			.skip(segment.start)
 			.take(segment.len())
 			.zip(data.chunks_exact_mut(PIXEL_BYTES))
