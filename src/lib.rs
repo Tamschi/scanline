@@ -9,7 +9,8 @@
 #![warn(clippy::pedantic, missing_docs)]
 #![allow(clippy::semicolon_if_nothing_returned)]
 
-use std::ops::Range;
+use std::{convert::TryInto, ops::Range};
+use tap::TryConv;
 
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
@@ -167,17 +168,26 @@ pub struct Position {
 }
 
 /// Renders an entire line.
-pub fn render_line<'a, P: PixelFormat, S: 'a + Sprite<P>, E: 'a + Effect<P>>(
+///
+/// # Panics
+///
+/// - Iff [`P::PIXEL_STRIDE_BITS`](`PixelFormat::PIXEL_STRIDE_BITS`) isn't a multiple of 8,
+/// - and also in cases where [`render_segment`] would panic.
+pub fn render_line<P: PixelFormat, S: Sprite<P>, E: Effect<P>>(
 	all_lines_range: Option<Range<isize>>,
 	line_index: isize,
 	buffer: &mut [u8],
-	sprites: impl IntoIterator<Item = &'a S>,
-	post_effects: impl IntoIterator<Item = &'a E>,
+	sprites: impl IntoIterator<Item = S>,
+	post_effects: impl IntoIterator<Item = E>,
 ) {
+	assert_eq!(P::PIXEL_STRIDE_BITS % 8, 0);
+
 	render_segment(
 		all_lines_range,
 		line_index,
-		0,
+		0..(buffer.len() / (P::PIXEL_STRIDE_BITS / 8))
+			.try_into()
+			.expect("`buffer.len() / P::PIXEL_STRIDE_BITS` too large"),
 		buffer,
 		sprites,
 		post_effects,
@@ -185,13 +195,33 @@ pub fn render_line<'a, P: PixelFormat, S: 'a + Sprite<P>, E: 'a + Effect<P>>(
 }
 
 /// Renders a segment of a line.
-pub fn render_segment<'a, P: PixelFormat, S: 'a + Sprite<P>, E: 'a + Effect<P>>(
+///
+/// # Panics
+///
+/// Iff coordinates and/or sizes are extreme enough to go out of range.
+pub fn render_segment<P: PixelFormat, S: Sprite<P>, E: Effect<P>>(
 	all_lines_range: Option<Range<isize>>,
 	line_index: isize,
-	segment_offset: isize,
+	segment_span: Range<isize>,
 	buffer: &mut [u8],
-	sprites: impl IntoIterator<Item = &'a S>,
-	post_effects: impl IntoIterator<Item = &'a E>,
+	sprites: impl IntoIterator<Item = S>,
+	post_effects: impl IntoIterator<Item = E>,
 ) {
-	todo!()
+	let segment_offset_bits = segment_span
+		.start
+		.try_conv::<i64>()
+		.expect("`segment_offset` too extreme")
+		.checked_mul(
+			P::PIXEL_STRIDE_BITS
+				.try_conv::<i64>()
+				.expect("`PIXEL_STRIDE_BITS` too large"),
+		)
+		.expect("segment offset in bits too extreme")
+		% 8;
+
+	for sprite in sprites {
+		if !sprite.lines(all_lines_range.clone()).contains(&line_index) {
+			continue;
+		}
+	}
 }
