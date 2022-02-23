@@ -35,7 +35,7 @@ impl Sprite<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
 		assert!(line >= 0);
 		let line: usize = line.try_into().expect("infallible");
 		assert!(line < self.data.len() / PIXEL_BYTES / self.width);
-		assert!(offset_bits % 8 == 0);
+		assert_eq!(offset_bits % 8, 0);
 		assert!(segment.start >= 0);
 		assert!(segment.start <= segment.end);
 		let segment: Range<usize> = segment.start.try_into().expect("infallible")
@@ -90,7 +90,7 @@ impl PostEffect<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
 		assert!(line >= 0);
 		let line: usize = line.try_into().expect("infallible");
 		assert!(line < self.data.len() / PIXEL_BYTES / self.width);
-		assert!(offset_bits % 8 == 0);
+		assert_eq!(offset_bits % 8, 0);
 		assert!(segment.start >= 0);
 		assert!(segment.start <= segment.end);
 		let segment: Range<usize> = segment.start.try_into().expect("infallible")

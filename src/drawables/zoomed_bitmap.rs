@@ -10,6 +10,32 @@ pub struct ZoomedBitmap<'a, P: PixelFormat> {
 	vertical_zoom_factor: usize,
 	_phantom: PhantomData<P>,
 }
+impl<'a> ZoomedBitmap<'a, RgbaNoPadding<8>> {
+	/// Creates a new instance of [`ZoomedBitmap`].
+	///
+	/// # Panics
+	///
+	/// Iff `data` doesn't represent a whole number of lines of width `width`.
+	#[must_use]
+	pub fn new(
+		width: usize,
+		data: &'a [u8],
+		horizontal_zoom_factor: usize,
+		vertical_zoom_factor: usize,
+	) -> Self {
+		assert_eq!(
+			data.len() % (width * RgbaNoPadding::<8>::PIXEL_STRIDE_BITS * 8),
+			0
+		);
+		Self {
+			width,
+			data,
+			horizontal_zoom_factor,
+			vertical_zoom_factor,
+			_phantom: PhantomData,
+		}
+	}
+}
 impl Sprite<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 	fn lines(&self, _all_lines_range: Option<Range<isize>>) -> Range<isize> {
 		0..(self.data.len() / 4 / self.width * self.vertical_zoom_factor)
@@ -41,7 +67,7 @@ impl Sprite<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 		assert!(line >= 0);
 		let line: usize = line.try_into().expect("infallible");
 		assert!(line < self.data.len() / PIXEL_BYTES / self.width * self.vertical_zoom_factor);
-		assert!(offset_bits % 8 == 0);
+		assert_eq!(offset_bits % 8, 0);
 		assert!(segment.start >= 0);
 		assert!(segment.start <= segment.end);
 		let segment: Range<usize> = segment.start.try_into().expect("infallible")
