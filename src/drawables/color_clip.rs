@@ -5,6 +5,7 @@ use tap::{Conv, TryConv};
 use crate::{pixel_formats::RgbaNoPadding, Effect, PixelFormat, Sprite};
 
 /// A flat-coloured dynamically masked sprite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ColorClip<
 	P: PixelFormat,
 	L: Fn(Option<Range<isize>>) -> Range<isize>,
