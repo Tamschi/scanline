@@ -2,7 +2,7 @@ use crate::{pixel_formats::RgbaNoPadding, Effect, PixelFormat, Sprite};
 use std::{convert::TryInto, iter, marker::PhantomData, ops::Range};
 use tap::{Conv, Pipe, TryConv};
 
-/// An integer-zoomed bitmap sprite.
+/// An integer-zoomed bitmap sprite, drawn with saturating addition.
 pub struct ZoomedBitmap<'a, P: PixelFormat> {
 	width: usize,
 	data: &'a [u8],
@@ -93,10 +93,12 @@ impl Sprite<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 			let dest_alpha = dest[3];
 
 			for (src, dest) in src.iter().zip(dest) {
-				*dest += ((*src).conv::<u16>() * (u8::MAX - dest_alpha).conv::<u16>()
-					/ u8::MAX.conv::<u16>())
-				.try_conv::<u8>()
-				.expect("infallible");
+				*dest = (*dest).saturating_add(
+					((*src).conv::<u16>() * (u8::MAX - dest_alpha).conv::<u16>()
+						/ u8::MAX.conv::<u16>())
+					.try_conv::<u8>()
+					.expect("infallible"),
+				);
 			}
 		}
 	}
@@ -160,11 +162,12 @@ impl Effect<RgbaNoPadding<8>> for ZoomedBitmap<'_, RgbaNoPadding<8>> {
 			let src_alpha = src[3];
 
 			for (src, dest) in src.iter().zip(dest) {
-				*dest = src
-					+ ((*dest).conv::<u16>() * (u8::MAX - src_alpha).conv::<u16>()
+				*dest = src.saturating_add(
+					((*dest).conv::<u16>() * (u8::MAX - src_alpha).conv::<u16>()
 						/ u8::MAX.conv::<u16>())
 					.try_conv::<u8>()
-					.expect("infallible");
+					.expect("infallible"),
+				);
 			}
 		}
 	}
