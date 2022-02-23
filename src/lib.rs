@@ -178,12 +178,18 @@ pub struct Position {
 ///
 /// - Iff [`P::PIXEL_STRIDE_BITS`](`PixelFormat::PIXEL_STRIDE_BITS`) isn't a multiple of 8,
 /// - and also in cases where [`render_segment`] would panic.
-pub fn render_line<P: PixelFormat, S: Sprite<P>, E: Effect<P>>(
+pub fn render_line<
+	P: PixelFormat,
+	S: Sprite<P>,
+	E: Effect<P>,
+	SI: IntoIterator<Item = (Position, S)>,
+	PI: IntoIterator<Item = (Position, E)>,
+>(
 	all_lines_range: &Option<Range<isize>>,
 	line_index: isize,
 	buffer: &mut [u8],
-	sprites: impl IntoIterator<Item = (Position, S)>,
-	post_effects: impl IntoIterator<Item = (Position, E)>,
+	sprites: SI,
+	post_effects: PI,
 ) {
 	assert_eq!(P::PIXEL_STRIDE_BITS % 8, 0);
 
@@ -207,14 +213,20 @@ pub fn render_line<P: PixelFormat, S: Sprite<P>, E: Effect<P>>(
 /// # Panics
 ///
 /// Iff coordinates and/or sizes are extreme enough to go out of range.
-pub fn render_segment<P: PixelFormat, S: Sprite<P>, E: Effect<P>>(
+pub fn render_segment<
+	P: PixelFormat,
+	S: Sprite<P>,
+	E: Effect<P>,
+	SI: IntoIterator<Item = (Position, S)>,
+	PI: IntoIterator<Item = (Position, E)>,
+>(
 	all_lines_range: &Option<Range<isize>>,
 	line_index: isize,
 	line_span: Range<isize>,
 	segment_span: Range<isize>,
 	buffer: &mut [u8],
-	sprites: impl IntoIterator<Item = (Position, S)>,
-	post_effects: impl IntoIterator<Item = (Position, E)>,
+	sprites: SI,
+	post_effects: PI,
 ) {
 	let segment_offset_bits = segment_span
 		.start
