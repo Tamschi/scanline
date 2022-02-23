@@ -8,6 +8,25 @@ pub struct Bitmap<'a, P: PixelFormat> {
 	data: &'a [u8],
 	_phantom: PhantomData<P>,
 }
+impl<'a> Bitmap<'a, RgbaNoPadding<8>> {
+	/// Creates a new instance of [`Bitmap`].
+	///
+	/// # Panics
+	///
+	/// Iff `data` doesn't represent a whole number of lines of width `width`.
+	#[must_use]
+	pub fn new(width: usize, data: &'a [u8]) -> Self {
+		assert_eq!(
+			data.len() % (width * RgbaNoPadding::<8>::PIXEL_STRIDE_BITS * 8),
+			0
+		);
+		Self {
+			width,
+			data,
+			_phantom: PhantomData,
+		}
+	}
+}
 impl Sprite<RgbaNoPadding<8>> for Bitmap<'_, RgbaNoPadding<8>> {
 	fn lines(&self) -> Range<isize> {
 		0..(self.data.len() / 4 / self.width)
