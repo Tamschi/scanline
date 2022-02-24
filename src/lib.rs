@@ -12,6 +12,7 @@
 use std::{
 	cmp::{max, min, Ordering},
 	convert::TryInto,
+	iter,
 	ops::{Add, Range},
 };
 use tap::TryConv;
@@ -59,7 +60,7 @@ pub trait Effect<P: PixelFormat> {
 		data: &mut [u8],
 	);
 }
-impl<T, P: PixelFormat> Effect<P> for &T
+impl<T: ?Sized, P: PixelFormat> Effect<P> for &T
 where
 	T: Effect<P>,
 {
@@ -125,7 +126,7 @@ pub trait Sprite<P: PixelFormat> {
 		data: &mut [u8],
 	);
 }
-impl<T, P: PixelFormat> Sprite<P> for &T
+impl<T: ?Sized, P: PixelFormat> Sprite<P> for &T
 where
 	T: Sprite<P>,
 {
@@ -183,13 +184,13 @@ pub fn render_line<
 	S: Sprite<P>,
 	E: Effect<P>,
 	SI: IntoIterator<Item = (Position, S)>,
-	PI: IntoIterator<Item = (Position, E)>,
+	EI: IntoIterator<Item = (Position, E)>,
 >(
 	all_lines_range: &Option<Range<isize>>,
 	line_index: isize,
 	buffer: &mut [u8],
 	sprites: SI,
-	post_effects: PI,
+	effects: EI,
 ) {
 	assert_eq!(P::PIXEL_STRIDE_BITS % 8, 0);
 
@@ -204,7 +205,7 @@ pub fn render_line<
 		line_span,
 		buffer,
 		sprites,
-		post_effects,
+		effects,
 	)
 }
 
@@ -218,7 +219,7 @@ pub fn render_segment<
 	S: Sprite<P>,
 	E: Effect<P>,
 	SI: IntoIterator<Item = (Position, S)>,
-	PI: IntoIterator<Item = (Position, E)>,
+	EI: IntoIterator<Item = (Position, E)>,
 >(
 	all_lines_range: &Option<Range<isize>>,
 	line_index: isize,
@@ -226,7 +227,7 @@ pub fn render_segment<
 	segment_span: Range<isize>,
 	buffer: &mut [u8],
 	sprites: SI,
-	post_effects: PI,
+	effects: EI,
 ) {
 	let segment_offset_bits = segment_span
 		.start
@@ -289,7 +290,7 @@ pub fn render_segment<
 		}
 	}
 
-	for (position, effect) in post_effects {
+	for (position, effect) in effects {
 		let all_lines_range = all_lines_range
 			.clone()
 			.map(|all_lines_range| all_lines_range.offset(-position.y));
@@ -356,4 +357,98 @@ impl<T: Ord> Intersect<T> for Range<T> {
 			_ => None,
 		}
 	}
+}
+
+/// Renders sprites under an entire line.
+///
+/// # Panics
+///
+/// - Iff [`P::PIXEL_STRIDE_BITS`](`PixelFormat::PIXEL_STRIDE_BITS`) isn't a multiple of 8,
+/// - and also in cases where [`render_segment`] would panic.
+pub fn render_under_line<P: PixelFormat, S: Sprite<P>, SI: IntoIterator<Item = (Position, S)>>(
+	all_lines_range: &Option<Range<isize>>,
+	line_index: isize,
+	buffer: &mut [u8],
+	sprites: SI,
+) {
+	render_line::<_, _, &dyn Effect<P>, _, _>(
+		all_lines_range,
+		line_index,
+		buffer,
+		sprites,
+		iter::empty(),
+	)
+}
+
+/// Renders effects over an entire line.
+///
+/// # Panics
+///
+/// - Iff [`P::PIXEL_STRIDE_BITS`](`PixelFormat::PIXEL_STRIDE_BITS`) isn't a multiple of 8,
+/// - and also in cases where [`render_segment`] would panic.
+pub fn render_over_line<P: PixelFormat, E: Effect<P>, EI: IntoIterator<Item = (Position, E)>>(
+	all_lines_range: &Option<Range<isize>>,
+	line_index: isize,
+	buffer: &mut [u8],
+	effects: EI,
+) {
+	render_line::<_, &dyn Sprite<P>, _, _, _>(
+		all_lines_range,
+		line_index,
+		buffer,
+		iter::empty(),
+		effects,
+	)
+}
+
+/// Renders sprites under a segment of a line.
+///
+/// # Panics
+///
+/// Iff coordinates and/or sizes are extreme enough to go out of range.
+pub fn render_under_segment<
+	P: PixelFormat,
+	S: Sprite<P>,
+	SI: IntoIterator<Item = (Position, S)>,
+>(
+	all_lines_range: &Option<Range<isize>>,
+	line_index: isize,
+	line_span: Range<isize>,
+	segment_span: Range<isize>,
+	buffer: &mut [u8],
+	sprites: SI,
+) {
+	render_segment::<_, _, &dyn Effect<P>, _, _>(
+		all_lines_range,
+		line_index,
+		line_span,
+		segment_span,
+		buffer,
+		sprites,
+		iter::empty(),
+	)
+}
+
+/// Renders effects over a segment of a line.
+///
+/// # Panics
+///
+/// Iff coordinates and/or sizes are extreme enough to go out of range.
+pub fn render_over_segment<P: PixelFormat, E: Effect<P>, EI: IntoIterator<Item = (Position, E)>>(
+	all_lines_range: &Option<Range<isize>>,
+	line_index: isize,
+	line_span: Range<isize>,
+	segment_span: Range<isize>,
+	buffer: &mut [u8],
+	effects: EI,
+) {
+	render_segment::<_, &dyn Sprite<P>, _, _, _>(
+		all_lines_range,
+		line_index,
+		line_span,
+		segment_span,
+		buffer,
+		iter::empty(),
+		effects,
+	)
 }
