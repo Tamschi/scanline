@@ -28,7 +28,7 @@ impl<'a> ZoomedBitmap<'a, RgbaNoPadding<8>> {
 		vertical_zoom_factor_denominator: NonZeroUsize,
 	) -> Self {
 		assert_eq!(
-			data.len() % (width * RgbaNoPadding::<8>::PIXEL_STRIDE_BITS * 8),
+			data.len() % (width * RgbaNoPadding::<8>::PIXEL_STRIDE_BITS / 8),
 			0
 		);
 		Self {
